@@ -6,6 +6,8 @@ from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.modules.auth_rbac.router import router as auth_router
 from app.modules.auth_rbac.seed import seed_auth_data
+from app.modules.simulation.engine import seed_simulation_data
+from app.modules.simulation.router import router as simulation_router
 
 settings = get_settings()
 
@@ -14,6 +16,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as session:
         await seed_auth_data(session)
+        await seed_simulation_data(session)
     yield
 
 
@@ -43,3 +46,4 @@ async def health_check() -> dict[str, str | bool]:
 
 
 app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(simulation_router, prefix=settings.api_prefix)

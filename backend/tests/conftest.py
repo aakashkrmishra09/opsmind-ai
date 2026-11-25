@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.main import app
 from app.modules.auth_rbac.seed import seed_auth_data
+from app.modules.simulation.engine import seed_simulation_data
 
 
 @pytest.fixture
@@ -31,6 +32,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
     async with TestSessionLocal() as session:
         await seed_auth_data(session)
+        await seed_simulation_data(session)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
