@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.modules.auth_rbac.router import router as auth_router
 from app.modules.auth_rbac.seed import seed_auth_data
+from app.modules.observability.router import router as observability_router
 from app.modules.simulation.engine import seed_simulation_data
 from app.modules.simulation.router import router as simulation_router
 
@@ -47,3 +48,4 @@ async def health_check() -> dict[str, str | bool]:
 
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(simulation_router, prefix=settings.api_prefix)
+app.include_router(observability_router, prefix=settings.api_prefix)
