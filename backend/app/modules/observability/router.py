@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.modules.auth_rbac.dependencies import get_current_user
 from app.modules.auth_rbac.models import User
+from app.modules.incidents.models import Incident
 from app.modules.simulation.models import Deployment, Service, TelemetryEvent, TelemetryMetric
 from app.modules.simulation.schemas import DeploymentRead, TelemetryEventRead
 
@@ -74,9 +75,33 @@ async def get_dashboard_summary(
     degraded_count = sum(1 for s in services if s.status == "degraded")
     unavailable_count = sum(1 for s in services if s.status == "unavailable")
 
-    active_services = [s for s in services if s.active_scenario is not None]
-    active_incidents = len(active_services)
-    critical_high_incidents = len(active_services)
+    inc_stmt = select(Incident).where(Incident.detected_at >= cutoff)
+    if environment:
+        inc_stmt = inc_stmt.where(Incident.environment == environment)
+    incidents = list((await db.execute(inc_stmt)).scalars().all())
+
+    open_incidents = [
+        i for i in incidents if i.status not in {"incident_resolved", "postmortem_generated"}
+    ]
+    active_sim_services = [s for s in services if s.active_scenario is not None]
+    active_incidents = max(len(open_incidents), len(active_sim_services))
+    critical_high_incidents = sum(
+        1 for i in open_incidents if i.severity in {"critical", "high"}
+    ) or len(active_sim_services)
+
+    ack_durations = [
+        (i.acknowledged_at - i.detected_at).total_seconds() / 60.0
+        for i in incidents
+        if i.acknowledged_at is not None and i.acknowledged_at >= i.detected_at
+    ]
+    res_durations = [
+        (i.resolved_at - i.detected_at).total_seconds() / 60.0
+        for i in incidents
+        if i.resolved_at is not None and i.resolved_at >= i.detected_at
+    ]
+
+    mtta_minutes = round(sum(ack_durations) / len(ack_durations), 2) if ack_durations else None
+    mttr_minutes = round(sum(res_durations) / len(res_durations), 2) if res_durations else None
 
     avg_availability = (
         round(sum(s.availability_pct for s in services) / total_services, 2)
@@ -85,7 +110,7 @@ async def get_dashboard_summary(
     )
 
     days = max(window.total_seconds() / 86400.0, 1.0 / 24.0)
-    incident_freq = round(active_incidents / days, 2)
+    incident_freq = round(max(len(incidents), active_incidents) / days, 2)
 
     dep_stmt = (
         select(Deployment)
@@ -142,12 +167,12 @@ async def get_dashboard_summary(
         ),
         MetricFormula(
             metric="Active Incidents",
-            formula="count(services with an active simulated fault scenario)",
+            formula="max(count(unresolved incidents in window), count(active fault scenarios))",
             unit="count",
         ),
         MetricFormula(
             metric="Incident Frequency",
-            formula="active_incidents / max(window_hours / 24, 1/24)",
+            formula="incidents_in_window / max(window_hours / 24, 1/24)",
             unit="incidents/day",
         ),
         MetricFormula(
@@ -167,8 +192,8 @@ async def get_dashboard_summary(
         unavailable_services=unavailable_count,
         active_incidents=active_incidents,
         critical_high_incidents=critical_high_incidents,
-        mtta_minutes=None,
-        mttr_minutes=None,
+        mtta_minutes=mtta_minutes,
+        mttr_minutes=mttr_minutes,
         incident_frequency_per_day=incident_freq,
         service_availability_pct=avg_availability,
         recent_deployments=recent_deployments,

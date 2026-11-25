@@ -1,4 +1,10 @@
-import type { DashboardSummary, ServiceItem, UserProfile } from '../types/ops';
+import type {
+  DashboardSummary,
+  IncidentDetail,
+  IncidentSummary,
+  ServiceItem,
+  UserProfile,
+} from '../types/ops';
 
 const TOKEN_KEY = 'opsmind_access_token';
 
@@ -59,4 +65,58 @@ export async function fetchServices(environment?: string): Promise<ServiceItem[]
   if (environment) qs.set('environment', environment);
   const query = qs.toString() ? `?${qs.toString()}` : '';
   return apiRequest<ServiceItem[]>(`/api/v1/services${query}`);
+}
+
+export async function fetchIncidentStages(): Promise<string[]> {
+  return apiRequest<string[]>('/api/v1/incidents/stages');
+}
+
+export async function fetchIncidents(environment?: string): Promise<IncidentSummary[]> {
+  const qs = new URLSearchParams();
+  if (environment) qs.set('environment', environment);
+  return apiRequest<IncidentSummary[]>(
+    `/api/v1/incidents${qs.toString() ? `?${qs.toString()}` : ''}`
+  );
+}
+
+export async function fetchIncidentDetail(id: string): Promise<IncidentDetail> {
+  return apiRequest<IncidentDetail>(`/api/v1/incidents/${id}`);
+}
+
+export async function createIncidentApi(payload: {
+  title: string;
+  description: string;
+  severity: string;
+  environment: string;
+}): Promise<IncidentDetail> {
+  return apiRequest<IncidentDetail>('/api/v1/incidents', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateIncidentStatusApi(
+  id: string,
+  payload: { status: string; note?: string }
+): Promise<IncidentDetail> {
+  return apiRequest<IncidentDetail>(`/api/v1/incidents/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function linkIncidentEvidenceApi(
+  id: string,
+  payload: { evidence_type: string; reference_id: string; stance: string; notes: string }
+): Promise<void> {
+  await apiRequest(`/api/v1/incidents/${id}/evidence`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function generatePostmortemApi(id: string): Promise<IncidentDetail> {
+  return apiRequest<IncidentDetail>(`/api/v1/incidents/${id}/postmortem`, {
+    method: 'POST',
+  });
 }

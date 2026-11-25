@@ -88,3 +88,42 @@ export interface DashboardSummary {
   metric_series: MetricPoint[];
   formulas: MetricFormula[];
 }
+
+export interface IncidentTimelineEntry {
+  id: string;
+  incident_id: string;
+  actor_user_id: string | null;
+  stage: string;
+  entry_type: string;
+  summary: string;
+  created_at: string;
+}
+
+export interface IncidentEvidenceItem {
+  id: string;
+  incident_id: string;
+  evidence_type: string;
+  reference_id: string;
+  stance: string;
+  notes: string;
+  collected_at: string;
+}
+
+export interface IncidentSummary {
+  id: string;
+  incident_code: string;
+  title: string;
+  description: string;
+  severity: string;
+  status: string;
+  environment: string;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface IncidentDetail extends IncidentSummary {
+  postmortem_markdown: string | null;
+  timeline_entries: IncidentTimelineEntry[];
+  evidence_items: IncidentEvidenceItem[];
+}
